@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cân hàng - Quét Tracking</title>
+<style>
+  :root{
+    --bg: #F7F5F0; --surface: #FFFFFF; --ink: #1C1B18; --muted: #7A7568; --border: #E4E0D6;
+    --accent: #C6511A; --accent-ink: #FFFFFF;
+    --ok: #256D3B; --ok-bg: #E8F3EA;
+    --warn: #A15C00; --warn-bg: #FBF0DD;
+    --err: #B3261E; --err-bg: #FBEAE9;
+    --mono: 'SFMono-Regular', 'JetBrains Mono', Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:16px 12px 100px; }
+  .app{ width:100%; max-width:420px; }
+  h1{ font-size:15px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+      color:var(--muted); margin:4px 0 6px; text-align:center; }
+  .subtle-link{ display:block; text-align:center; font-size:12px; color:var(--muted); text-decoration:underline;
+      background:none; border:none; margin:0 auto 14px; cursor:pointer; }
+
+  /* Màn đăng nhập */
+  #loginGate{ min-height:80vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  #loginGate .lock{ font-size:40px; margin-bottom:8px; }
+  #loginGate h2{ font-size:16px; margin:4px 0 20px; color:var(--muted); font-weight:600; }
+  #googleSignInBtn{ margin-top:6px; }
+  .whoami{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:12px; color:var(--muted); margin-bottom:10px; }
+  .whoami button{ background:none; border:none; color:var(--accent); text-decoration:underline; font-size:12px; cursor:pointer; padding:0; }
+
+  .ticket{ background:var(--surface); border:1.5px dashed var(--border); border-radius:14px;
+    padding:16px; position:relative; margin-bottom:14px; }
+  .ticket::before, .ticket::after{ content:""; position:absolute; width:14px; height:14px; background:var(--bg);
+    border:1.5px dashed var(--border); border-radius:50%; top:50%; transform:translateY(-50%); }
+  .ticket::before{ left:-8px; } .ticket::after{ right:-8px; }
+  .ticket label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  #barcodeInput{ width:100%; font-family:var(--mono); font-size:19px; letter-spacing:.02em;
+    padding:10px 8px; border:none; border-bottom:2px solid var(--border);
+    background:transparent; color:var(--ink); margin:4px 0 12px; outline:none; }
+  #barcodeInput:focus{ border-bottom-color:var(--accent); }
+  .row{ display:flex; gap:8px; }
+  button{ font-family:var(--sans); font-size:14px; font-weight:600; border:none; border-radius:10px;
+    padding:11px 14px; cursor:pointer; transition:transform .05s ease; }
+  button:active{ transform:scale(.97); }
+  button:disabled{ opacity:.5; cursor:default; }
+  .btn-outline{ background:var(--surface); border:1.5px solid var(--border); color:var(--ink); flex:1; }
+  .btn-accent{ background:var(--accent); color:var(--accent-ink); flex:1; }
+
+  #cameraWrap{ display:none; margin-top:12px; border-radius:10px; overflow:hidden; }
+  #cam-note{ font-size:12px; color:var(--muted); margin-top:6px; }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:16px; margin-bottom:14px; display:none; }
+  .card.show{ display:block; }
+  .field-label{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:4px;}
+  .cust-name{ font-size:20px; font-weight:700; margin:0 0 10px; }
+  .order-meta{ font-size:13px; color:var(--ink); margin-bottom:4px; }
+  .pill{ display:inline-block; font-size:13px; font-weight:700;
+    background:var(--bg); border-radius:8px; padding:6px 10px; margin:8px 0; }
+  .cellpreview{ font-family:var(--mono); font-size:12px; background:var(--bg); border-radius:8px;
+    padding:8px 10px; margin:4px 0 10px; white-space:pre-line; line-height:1.6; color:var(--muted); }
+  .banner{ border-radius:10px; padding:10px 12px; font-size:13.5px; margin-bottom:12px; }
+  .banner.warn{ background:var(--warn-bg); color:var(--warn); }
+  .banner.ok{ background:var(--ok-bg); color:var(--ok); }
+  .banner.err{ background:var(--err-bg); color:var(--err); }
+
+  .text-input{ width:100%; padding:10px; border:1.5px solid var(--border); border-radius:8px;
+    margin-bottom:12px; font-size:14px; font-family:var(--sans); }
+
+  .choice-list{ display:flex; flex-direction:column; gap:8px; margin:10px 0 4px; }
+  .choice-item{ border:1.5px solid var(--border); border-radius:10px; padding:10px 12px;
+    display:flex; align-items:flex-start; gap:10px; cursor:pointer; }
+  .choice-item.selected{ border-color:var(--accent); background:#FDF3EC; }
+  .choice-item.readonly{ cursor:default; opacity:.65; }
+  .choice-item input{ margin-top:3px; }
+  .choice-item .cname{ font-weight:700; font-size:14px; }
+  .choice-item .cmeta{ font-size:12px; color:var(--muted); }
+  .choice-item .cprog{ font-size:12px; color:var(--accent); font-weight:600; margin-top:2px; }
+
+  .weight-row{ display:flex; align-items:center; gap:8px; margin-top:14px; }
+  .weight-row input{ flex:1; font-family:var(--mono); font-size:22px; padding:10px; border:2px solid var(--border);
+    border-radius:10px; text-align:right; outline:none; }
+  .weight-row input:focus{ border-color:var(--accent); }
+  .weight-row input:disabled{ background:var(--bg); color:var(--muted); }
+  .unit{ font-size:14px; color:var(--muted); font-weight:600; }
+  .actions{ display:flex; gap:8px; margin-top:14px; }
+  .hidden{ display:none !important; }
+  .spin{ display:inline-block; animation:spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Màn đăng nhập Google - che toàn bộ app cho tới khi xác thực xong -->
+<div class="app" id="loginGate">
+  <div class="lock">🔒</div>
+  <h2>Đăng nhập Google để dùng app cân hàng</h2>
+  <div id="googleSignInBtn"></div>
+  <div id="loginError" style="margin-top:14px;"></div>
+</div>
+
+<div class="app hidden" id="mainApp">
+  <h1>Cân hàng · Quét tracking</h1>
+  <div class="whoami"><span id="whoamiText"></span> · <button id="btnSignOut" type="button">Đăng xuất</button></div>
+  <button class="subtle-link" id="btnUndo" type="button">↩️ Hoàn tác thao tác gần nhất</button>
+  <div id="topBanner"></div>
+
+  <div class="ticket">
+    <label>Mã tracking</label>
+    <input id="barcodeInput" placeholder="Quét hoặc gõ mã..." autocomplete="off">
+    <div class="row">
+      <button class="btn-outline" id="btnCamera" type="button">📷 Camera</button>
+      <button class="btn-accent" id="btnLookup" type="button">🔍 Tra cứu</button>
+    </div>
+    <div id="cameraWrap"><div id="reader"></div></div>
+    <div id="cam-note"></div>
+  </div>
+
+  <div class="card" id="newCard">
+    <div class="banner warn">🆕 Tracking mới — chưa có trong dữ liệu. Nhập thông tin để thêm dòng mới:</div>
+    <div class="field-label">Tên khách hàng</div>
+    <input id="newCustName" class="text-input" type="text" placeholder="VD: Nguyễn Văn A">
+    <div class="field-label">Nội dung đơn hàng</div>
+    <input id="newOrderInfo" class="text-input" type="text" placeholder="VD: đơn ABC 5 items">
+    <div class="weight-row"><input id="newWeightInput" type="number" step="0.1" min="0" inputmode="decimal" placeholder="0.0"><span class="unit">kg</span></div>
+    <div class="actions"><button class="btn-accent" style="width:100%" id="btnSaveNew" type="button">➕ Thêm dòng mới</button></div>
+  </div>
+
+  <div class="card" id="resultCard">
+    <div class="field-label">Khách hàng</div>
+    <p class="cust-name" id="custName">—</p>
+    <div class="field-label">Thông tin đơn hàng</div>
+    <p class="order-meta" id="orderInfo">—</p>
+    <div id="orderExtra" style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);margin:-2px 0 8px;flex-wrap:wrap;"></div>
+    <div class="pill" id="trackProgress"></div>
+    <div class="cellpreview hidden" id="cellPreview"></div>
+
+    <div id="pendingSection">
+      <div class="weight-row"><input id="weightInput" type="number" step="0.1" min="0" inputmode="decimal" placeholder="0.0"><span class="unit">kg</span></div>
+      <div class="actions"><button class="btn-accent" style="width:100%" id="btnSave" type="button">💾 Lưu</button></div>
+    </div>
+
+    <div id="alreadySection" style="display:none">
+      <div class="banner ok" id="alreadyBanner"></div>
+      <div class="weight-row"><input id="editWeightInput" type="number" step="0.1" min="0" inputmode="decimal" disabled><span class="unit">kg</span></div>
+      <div class="actions">
+        <button class="btn-outline" id="btnUnlockEdit" type="button">✏️ Sửa số kg này</button>
+        <button class="btn-accent hidden" id="btnSaveEdit" type="button">💾 Lưu thay đổi</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="choiceCard">
+    <div class="banner warn">⚠️ Tracking này xuất hiện ở nhiều đơn khác nhau. Vui lòng chọn khách hàng để ghi chú khối lượng:</div>
+    <div class="choice-list" id="choiceList"></div>
+    <div class="weight-row"><input id="choiceWeightInput" type="number" step="0.1" min="0" inputmode="decimal" placeholder="0.0" disabled><span class="unit">kg</span></div>
+    <div class="actions"><button class="btn-accent" style="width:100%" id="btnSaveChoice" type="button">💾 Lưu</button></div>
+  </div>
+
+  <div class="card" id="savedCard">
+    <div class="banner ok" id="savedBanner">✅ Đã lưu</div>
+    <div class="cellpreview hidden" id="savedPreview"></div>
+    <div class="actions">
+      <button class="btn-outline" id="btnEdit" type="button">✏️ Sửa</button>
+      <button class="btn-accent" id="btnNext" type="button">➡️ Quét tiếp</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" onerror="document.getElementById('btnCamera').style.display='none'; document.getElementById('cam-note').textContent='Camera scan không khả dụng ở bản xem trước - dùng máy quét tay hoặc gõ mã.'"></script>
+<script>
+const EMOJI_MAP = {1:'1️⃣',2:'2️⃣',3:'3️⃣',4:'4️⃣',5:'5️⃣',6:'6️⃣',7:'7️⃣',8:'8️⃣',9:'9️⃣'};
+
+/* ============================================================
+   CẤU HÌNH
+   API_URL: link .../exec sau khi deploy Apps Script
+   GOOGLE_CLIENT_ID: PHẢI giống hệt GOOGLE_CLIENT_ID khai báo trong Code.gs
+   ============================================================ */
+const API_URL = "https://script.google.com/macros/s/AKfycbyePP9t4MUu2vJGHtc_FqDqJbxZ-O5eaNDlCocs6j8p61zKYfBcrrdX9Wyqu03HGLZb/exec";
+const GOOGLE_CLIENT_ID = "617966245110-33ot5gql0g8q7dn13o6vrjrlmuep5g57.apps.googleusercontent.com";
+const IS_LIVE = API_URL.indexOf('PASTE_') === -1; // chưa điền link thật -> tự dùng mock để xem trước
+
+let idToken = null;
+let signedInEmail = '';
+let signedInName = '';
+
+function decodeJwtPayload(token){
+  try{ return JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); }
+  catch(e){ return {}; }
+}
+
+function handleCredentialResponse(response){
+  idToken = response.credential;
+  const payload = decodeJwtPayload(idToken);
+  signedInEmail = payload.email || '';
+  signedInName = payload.name || payload.email || '';
+  sessionStorage.setItem('idToken', idToken);
+  showMainApp();
+  callApi('logLogin', {}, () => {}); // ghi nhận lần đăng nhập vào sheet History, không cần chờ phản hồi
+}
+
+function initGoogleSignIn(){
+  if(!IS_LIVE){ // preview: bỏ qua đăng nhập thật, vào thẳng app để test UI
+    signedInEmail = 'preview@local'; signedInName = 'Xem trước (mock)';
+    showMainApp();
+    return;
+  }
+  if(typeof google === 'undefined' || !google.accounts){
+    document.getElementById('loginError').innerHTML = '<div class="banner err">Không tải được thư viện đăng nhập Google. Kiểm tra kết nối mạng và tải lại trang.</div>';
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleCredentialResponse
+  });
+  google.accounts.id.renderButton(document.getElementById('googleSignInBtn'), { theme:'filled_blue', size:'large', width:280 });
+  google.accounts.id.prompt();
+}
+
+function showMainApp(){
+  document.getElementById('loginGate').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+  document.getElementById('whoamiText').textContent = signedInName;
+  document.getElementById('barcodeInput').focus();
+}
+function signOut(){
+  idToken = null; signedInEmail=''; signedInName='';
+  sessionStorage.removeItem('idToken');
+  if(typeof google !== 'undefined' && google.accounts) google.accounts.id.disableAutoSelect();
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('loginGate').classList.remove('hidden');
+}
+window.addEventListener('load', initGoogleSignIn);
+
+/* ============================================================
+   MOCK DATA — chỉ dùng khi xem preview
+   ============================================================ */
+let DB = [
+  { row:2, customerName:"Khách Yoox", orderCode:"", productNote:"đơn Yoox 7 items",
+    trackingLines:["1Z2E08V20316797682"], weightFormula:"" },
+  { row:3, customerName:"Khách Dell", orderCode:"", productNote:"Dell Latitude 5420 Intel Core i7 · Quantity: 8",
+    trackingLines:["381910672702","872849902310"], weightFormula:"" },
+  { row:4, customerName:"Khách Stanley A", orderCode:"", productNote:"đơn Stanley 10 items",
+    trackingLines:["1️⃣ 1ZY0G8680309114838","1ZC1F5450325350593"], weightFormula:"0.4" },
+  { row:8, customerName:"Trần Văn Minh", orderCode:"", productNote:"Đồ chơi trẻ em (3 kiện)",
+    trackingLines:["1️⃣ 9400111899223197001","2️⃣ 9400111899223197002","9400111899223197003"], weightFormula:"0.4+0.3",
+    orderNoteColor:"#f4cccc", orderNoteLink:"https://example.com/don-dac-biet-8" },
+  { row:10, customerName:"Lê Thị Hoa", orderCode:"", productNote:"Mỹ phẩm",
+    trackingLines:["LX123456785VN","1️⃣ 1ZC6039H0335004642"], weightFormula:"0.5", orderNoteColor:"#fce5cd" },
+  { row:11, customerName:"Phạm Văn Long", orderCode:"", productNote:"Thực phẩm chức năng",
+    trackingLines:["LX123456785VN"], weightFormula:"" },
+];
+let mockLog = [];
+
+function currentLabelOnLine(line){ for(let n=1;n<=9;n++){ if(line.startsWith(EMOJI_MAP[n]+' ')) return EMOJI_MAP[n]; } return null; }
+function labelNumber(label){ for(let n=1;n<=9;n++){ if(EMOJI_MAP[n]===label) return n; } return null; }
+function weighedCount(formula){ return formula ? String(formula).split('+').filter(x=>x!=='').length : 0; }
+function findLineIdx(lines, code){ const last6 = code.slice(-6); return lines.findIndex(l => l.trim().slice(-6) === last6); }
+
+function mockSaveWeight(row, code, weight, mode){
+  const rec = DB.find(r => r.row === row);
+  const before = JSON.parse(JSON.stringify(rec));
+  const idx = findLineIdx(rec.trackingLines, code);
+  if(mode === 'overwrite'){
+    const label = currentLabelOnLine(rec.trackingLines[idx]);
+    if(rec.trackingLines.length > 1 && label){
+      const n = labelNumber(label);
+      const parts = rec.weightFormula ? rec.weightFormula.split('+') : [];
+      parts[n-1] = String(weight);
+      rec.weightFormula = parts.join('+');
+    } else { rec.weightFormula = String(weight); }
+  } else {
+    if(rec.trackingLines.length > 1 && !currentLabelOnLine(rec.trackingLines[idx])){
+      const n = weighedCount(rec.weightFormula) + 1;
+      const label = EMOJI_MAP[n] || `(${n})`;
+      rec.trackingLines[idx] = `${label} ${rec.trackingLines[idx]}`;
+    }
+    rec.weightFormula = rec.weightFormula ? `${rec.weightFormula}+${weight}` : `${weight}`;
+  }
+  mockLog.push({type:'ROW', row, before});
+  return JSON.parse(JSON.stringify(rec));
+}
+
+/* ============================================================
+   BRIDGE — gọi API thật qua fetch() kèm idToken, mock khi preview
+   ============================================================ */
+function callApi(action, payload, cb){
+  if(!IS_LIVE){ callMock(action, payload, cb); return; }
+  fetch(API_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'}, // giữ 'simple request' để tránh preflight CORS
+    body: JSON.stringify(Object.assign({idToken: idToken}, payload))
+  })
+  .then(r => r.json())
+  .then(res => {
+    if(!res.ok){
+      if(res.authError){ showApiError({message: res.error}); signOut(); return; }
+      showApiError({message: res.error}); return;
+    }
+    cb(res.data);
+  })
+  .catch(err => showApiError({message: 'Lỗi kết nối: ' + err.message}));
+}
+function callMock(action, payload, cb){
+  if(action==='lookup'){
+    const last6 = payload.code.slice(-6);
+    cb(DB.filter(r=>r.trackingLines.some(l=>l.slice(-6)===last6)));
+  }
+  else if(action==='saveWeight'){ cb(mockSaveWeight(payload.row, payload.code, payload.weight, payload.mode)); }
+  else if(action==='saveDuplicateChoice'){
+    const chosen = mockSaveWeight(payload.chosenRow, payload.code, payload.weight, 'add');
+    const others = payload.otherRows.map(r => mockSaveWeight(r, payload.code, 0, 'add'));
+    cb({chosen, others});
+  }
+  else if(action==='createNewRow'){
+    const nextRow = Math.max(...DB.map(r=>r.row)) + 1;
+    const rec = {row:nextRow, customerName:payload.customerName, orderCode:"", productNote:payload.orderInfo, trackingLines:[payload.code], weightFormula:`${payload.weight}`};
+    DB.push(rec); mockLog.push({type:'NEW', row:nextRow});
+    cb(rec);
+  }
+  else if(action==='undo'){
+    const last = mockLog.pop();
+    if(!last){ showApiError({message:'Không có thao tác nào để hoàn tác.'}); return; }
+    if(last.type==='NEW'){ DB = DB.filter(r=>r.row!==last.row); }
+    else{ const i = DB.findIndex(r=>r.row===last.row); if(i>-1) DB[i]=last.before; }
+    cb({row:last.row, message:`Đã hoàn tác thao tác gần nhất (dòng ${last.row}).`});
+  }
+}
+function apiLookup(code, cb){ callApi('lookup', {code}, cb); }
+function apiSaveWeight(row, code, weight, mode, cb){ callApi('saveWeight', {row, code, weight, mode}, cb); }
+function apiSaveChoice(code, chosenRow, otherRows, weight, cb){ callApi('saveDuplicateChoice', {code, chosenRow, otherRows, weight}, cb); }
+function apiCreateNewRow(code, custName, orderInfo, weight, cb){ callApi('createNewRow', {code, customerName:custName, orderInfo, weight}, cb); }
+function apiUndo(cb){ callApi('undo', {}, cb); }
+function showApiError(err){
+  el('topBanner').innerHTML = `<div class="banner err">⚠️ ${err.message || err}</div>`;
+  setTimeout(()=>{ el('topBanner').innerHTML=''; }, 4000);
+}
+
+/* ===== Preview-only helpers ===== */
+function isLineWeighed(rec, code){
+  if(rec.trackingLines.length <= 1) return !!rec.weightFormula;
+  const idx = findLineIdx(rec.trackingLines, code);
+  if(idx===-1) return false;
+  return !!currentLabelOnLine(rec.trackingLines[idx]);
+}
+function weightOfLine(rec, code){
+  if(rec.trackingLines.length <= 1) return rec.weightFormula ? parseFloat(rec.weightFormula) : null;
+  const idx = findLineIdx(rec.trackingLines, code);
+  const label = currentLabelOnLine(rec.trackingLines[idx]);
+  if(!label) return null;
+  const n = labelNumber(label);
+  const parts = rec.weightFormula ? rec.weightFormula.split('+') : [];
+  return parts[n-1] !== undefined ? parseFloat(parts[n-1]) : null;
+}
+function previewLabel(rec, code){
+  if(rec.trackingLines.length <= 1) return null;
+  const idx = findLineIdx(rec.trackingLines, code);
+  const existing = currentLabelOnLine(rec.trackingLines[idx]);
+  if(existing) return existing;
+  const n = weighedCount(rec.weightFormula) + 1;
+  return EMOJI_MAP[n] || `(${n})`;
+}
+
+/* ============================================================
+   UI STATE
+   ============================================================ */
+const el = id => document.getElementById(id);
+let current = null, currentCode = '', choiceMatches = [], choiceSelectedRow = null;
+
+function hideAllCards(){ ['resultCard','newCard','savedCard','choiceCard'].forEach(id => el(id).classList.remove('show')); }
+function resetToIdle(){
+  current = null; currentCode=''; choiceMatches = []; choiceSelectedRow = null;
+  el('barcodeInput').value = '';
+  hideAllCards();
+  el('barcodeInput').focus();
+}
+
+function renderOrderExtra(rec){
+  const parts = [];
+  if(rec.orderNoteColor && rec.orderNoteColor.toLowerCase() !== '#ffffff'){
+    parts.push(`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:12px;height:12px;border-radius:3px;border:1px solid var(--border);background:${rec.orderNoteColor};display:inline-block;"></span>Màu trong Sheet</span>`);
+  }
+  if(rec.orderNoteLink){
+    parts.push(`<a href="${rec.orderNoteLink}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;text-decoration:none;">🔗 Mở link đính kèm</a>`);
+  }
+  el('orderExtra').innerHTML = parts.join('');
+}
+
+function showSingle(rec, code){
+  current = rec; currentCode = code;
+  hideAllCards();
+  el('resultCard').classList.add('show');
+  el('custName').textContent = rec.customerName;
+  el('orderInfo').textContent = rec.productNote;
+  renderOrderExtra(rec);
+
+  const total = rec.trackingLines.length;
+  const done = weighedCount(rec.weightFormula);
+  const weighed = isLineWeighed(rec, code);
+
+  if(total > 1){
+    el('cellPreview').textContent = rec.trackingLines.join('\n');
+    el('cellPreview').classList.remove('hidden');
+    el('trackProgress').textContent = `📦 Đơn có ${total} tracking · đã về ${done}/${total}` +
+      (weighed ? '' : ` · mã này gắn nhãn ${previewLabel(rec, code)}`);
+  } else {
+    el('cellPreview').classList.add('hidden');
+    el('trackProgress').textContent = `📦 Đơn 1 tracking`;
+  }
+
+  if(weighed){
+    el('pendingSection').style.display = 'none';
+    el('alreadySection').style.display = 'block';
+    const w = weightOfLine(rec, code);
+    const label = total > 1 ? currentLabelOnLine(rec.trackingLines[findLineIdx(rec.trackingLines, code)]) : null;
+    el('alreadyBanner').textContent = `✅ Mã này đã được cân trước đó${label ? ' (nhãn '+label+')' : ''}: ${w}kg`;
+    el('editWeightInput').value = w;
+    el('editWeightInput').disabled = true;
+    el('btnSaveEdit').classList.add('hidden');
+    el('btnUnlockEdit').classList.remove('hidden');
+  } else {
+    el('alreadySection').style.display = 'none';
+    el('pendingSection').style.display = 'block';
+    el('weightInput').value = ''; el('weightInput').disabled = false; el('weightInput').focus();
+  }
+}
+
+function extraBadgeHtml(rec){
+  const parts = [];
+  if(rec.orderNoteColor && rec.orderNoteColor.toLowerCase() !== '#ffffff'){
+    parts.push(`<span style="width:11px;height:11px;border-radius:3px;border:1px solid var(--border);background:${rec.orderNoteColor};display:inline-block;"></span>`);
+  }
+  if(rec.orderNoteLink){
+    parts.push(`<a href="${rec.orderNoteLink}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">🔗</a>`);
+  }
+  return parts.length ? `<span style="display:inline-flex;gap:5px;align-items:center;margin-left:6px;">${parts.join('')}</span>` : '';
+}
+
+function renderChoices(){
+  const list = el('choiceList'); list.innerHTML = '';
+  choiceMatches.forEach((rec, i) => {
+    const total = rec.trackingLines.length, done = weighedCount(rec.weightFormula);
+    const weighed = isLineWeighed(rec, currentCode);
+    const trackingBlock = `<div class="cellpreview" style="margin:8px 0 0;">${rec.trackingLines.join('\n')}</div>`;
+    const div = document.createElement('div');
+    if(weighed){
+      const w = weightOfLine(rec, currentCode);
+      const label = total > 1 ? currentLabelOnLine(rec.trackingLines[findLineIdx(rec.trackingLines, currentCode)]) : null;
+      div.className = 'choice-item readonly';
+      div.innerHTML = `<div style="width:16px"></div><div style="flex:1">
+        <div class="cname">${rec.customerName} <span style="font-weight:400;color:var(--muted);font-size:12px">(đã cân${label ? ' - nhãn '+label : ''}: ${w}kg)</span>${extraBadgeHtml(rec)}</div>
+        <div class="cmeta">${rec.productNote}</div>
+        ${total>1 ? `<div class="cprog">Đơn có ${total} tracking · đã về ${done}/${total}</div>` : ''}
+        ${trackingBlock}
+      </div>`;
+    } else {
+      div.className = 'choice-item' + (choiceSelectedRow===rec.row ? ' selected' : '');
+      div.innerHTML = `<input type="radio" name="choice" ${choiceSelectedRow===rec.row?'checked':''}>
+        <div style="flex:1">
+          <div class="cname">Khách ${i+1}: ${rec.customerName}${extraBadgeHtml(rec)}</div>
+          <div class="cmeta">${rec.productNote}</div>
+          ${total>1 ? `<div class="cprog">Đơn có ${total} tracking · đã về ${done}/${total}</div>` : ''}
+          ${trackingBlock}
+        </div>`;
+      div.addEventListener('click', () => { choiceSelectedRow = rec.row; renderChoices(); el('choiceWeightInput').disabled=false; el('choiceWeightInput').focus(); });
+    }
+    list.appendChild(div);
+  });
+}
+
+function showChoice(matches){
+  choiceMatches = matches; choiceSelectedRow = null;
+  hideAllCards();
+  el('choiceCard').classList.add('show');
+  el('choiceWeightInput').value=''; el('choiceWeightInput').disabled = true;
+  renderChoices();
+}
+
+function setBusy(btn, busy, labelBusy, labelIdle){
+  btn.disabled = busy;
+  btn.innerHTML = busy ? `<span class="spin">⏳</span> ${labelBusy}` : labelIdle;
+}
+
+function doLookup(){
+  const code = el('barcodeInput').value.trim();
+  if(!code) return;
+  currentCode = code;
+  hideAllCards();
+  setBusy(el('btnLookup'), true, 'Đang tra...', '🔍 Tra cứu');
+  apiLookup(code, matches => {
+    setBusy(el('btnLookup'), false, '', '🔍 Tra cứu');
+    if(!matches || matches.length===0){
+      el('newCustName').value=''; el('newOrderInfo').value=''; el('newWeightInput').value='';
+      el('newCard').classList.add('show');
+      return;
+    }
+    if(matches.length===1){ showSingle(matches[0], code); }
+    else{ showChoice(matches); }
+  });
+}
+
+el('btnLookup').addEventListener('click', doLookup);
+el('barcodeInput').addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); doLookup(); } });
+el('btnSignOut').addEventListener('click', signOut);
+
+el('btnSave').addEventListener('click', () => {
+  if(!current) return;
+  const w = parseFloat(el('weightInput').value || 0);
+  setBusy(el('btnSave'), true, 'Đang lưu...', '💾 Lưu');
+  apiSaveWeight(current.row, currentCode, w, 'add', updatedRec => {
+    setBusy(el('btnSave'), false, '', '💾 Lưu');
+    current = updatedRec;
+    const done = weighedCount(updatedRec.weightFormula), total = updatedRec.trackingLines.length;
+    el('resultCard').classList.remove('show'); el('savedCard').classList.add('show');
+    el('savedBanner').textContent = `✅ Đã lưu ${w}kg cho ${updatedRec.customerName}` + (total>1 ? ` · đã về ${done}/${total} tracking` : '');
+    el('savedPreview').classList.toggle('hidden', total<=1);
+    if(total>1) el('savedPreview').textContent = updatedRec.trackingLines.join('\n');
+    el('barcodeInput').value = ''; // Reset mã cũ
+    el('barcodeInput').focus(); // ĐÃ FIX: Auto-focus sẵn sàng quét tiếp
+  });
+});
+
+el('btnUnlockEdit').addEventListener('click', () => {
+  el('editWeightInput').disabled = false; el('editWeightInput').focus();
+  el('btnSaveEdit').classList.remove('hidden'); el('btnUnlockEdit').classList.add('hidden');
+});
+el('btnSaveEdit').addEventListener('click', () => {
+  if(!current) return;
+  const w = parseFloat(el('editWeightInput').value || 0);
+  setBusy(el('btnSaveEdit'), true, 'Đang lưu...', '💾 Lưu thay đổi');
+  apiSaveWeight(current.row, currentCode, w, 'overwrite', updatedRec => {
+    setBusy(el('btnSaveEdit'), false, '', '💾 Lưu thay đổi');
+    current = updatedRec;
+    const total = updatedRec.trackingLines.length, done = weighedCount(updatedRec.weightFormula);
+    el('resultCard').classList.remove('show'); el('savedCard').classList.add('show');
+    el('savedBanner').textContent = `✅ Đã cập nhật ${w}kg cho ${updatedRec.customerName}` + (total>1 ? ` · đã về ${done}/${total} tracking` : '');
+    el('savedPreview').classList.toggle('hidden', total<=1);
+    if(total>1) el('savedPreview').textContent = updatedRec.trackingLines.join('\n');
+    el('barcodeInput').value = ''; // Reset mã cũ
+    el('barcodeInput').focus(); // ĐÃ FIX: Auto-focus sẵn sàng quét tiếp
+  });
+});
+
+el('btnSaveChoice').addEventListener('click', () => {
+  if(!choiceSelectedRow) return;
+  const w = parseFloat(el('choiceWeightInput').value || 0);
+  const chosen = choiceMatches.find(r => r.row === choiceSelectedRow);
+  const otherRows = choiceMatches.filter(r => r.row !== choiceSelectedRow && !isLineWeighed(r, currentCode)).map(r=>r.row);
+  setBusy(el('btnSaveChoice'), true, 'Đang lưu...', '💾 Lưu');
+  apiSaveChoice(currentCode, choiceSelectedRow, otherRows, w, result => {
+    setBusy(el('btnSaveChoice'), false, '', '💾 Lưu');
+    el('choiceCard').classList.remove('show'); el('savedCard').classList.add('show');
+    const othersTxt = result.others.length ? result.others.map(r => `${r.customerName} +0kg`).join(', ') : '(không có)';
+    el('savedBanner').textContent = `✅ Đã lưu ${w}kg cho ${result.chosen.customerName}. Cộng dồn +0kg cho: ${othersTxt}.`;
+    const previewAll = [result.chosen, ...result.others].map(r => `${r.customerName}: ${r.trackingLines.join(' | ')}`).join('\n');
+    el('savedPreview').textContent = previewAll; el('savedPreview').classList.remove('hidden');
+    el('barcodeInput').value = ''; // Reset mã cũ
+    el('barcodeInput').focus(); // ĐÃ FIX: Auto-focus sẵn sàng quét tiếp
+  });
+});
+
+el('btnSaveNew').addEventListener('click', () => {
+  const custName = el('newCustName').value.trim() || '(chưa đặt tên)';
+  const orderInfo = el('newOrderInfo').value.trim();
+  const w = parseFloat(el('newWeightInput').value || 0);
+  setBusy(el('btnSaveNew'), true, 'Đang thêm...', '➕ Thêm dòng mới');
+  apiCreateNewRow(currentCode, custName, orderInfo, w, rec => {
+    setBusy(el('btnSaveNew'), false, '', '➕ Thêm dòng mới');
+    el('newCard').classList.remove('show'); el('savedCard').classList.add('show');
+    el('savedBanner').textContent = `✅ Đã thêm dòng mới (dòng ${rec.row}): ${custName} — ${orderInfo || '(chưa nhập nội dung)'} · ${w}kg`;
+    el('savedPreview').classList.add('hidden');
+    el('barcodeInput').value = ''; // Reset mã cũ
+    el('barcodeInput').focus(); // ĐÃ FIX: Auto-focus sẵn sàng quét tiếp
+  });
+});
+
+el('btnEdit').addEventListener('click', () => {
+  el('savedCard').classList.remove('show');
+  if(current){ showSingle(current, currentCode); if(isLineWeighed(current, currentCode)){ el('btnUnlockEdit').click(); } }
+});
+el('btnNext').addEventListener('click', resetToIdle);
+
+el('btnUndo').addEventListener('click', () => {
+  apiUndo(res => {
+    el('topBanner').innerHTML = `<div class="banner ok">↩️ ${res.message}</div>`;
+    setTimeout(()=>{ el('topBanner').innerHTML=''; }, 4000);
+    resetToIdle();
+  });
+});
+
+/* Camera scan */
+let qrScanner = null;
+el('btnCamera').addEventListener('click', async () => {
+  const wrap = el('cameraWrap');
+  if(wrap.style.display === 'block'){ wrap.style.display='none'; if(qrScanner){ try{await qrScanner.stop();}catch(e){} } return; }
+  if(typeof Html5Qrcode === 'undefined'){ el('cam-note').textContent='Thư viện camera chưa tải được — dùng máy quét tay hoặc gõ mã.'; return; }
+  wrap.style.display = 'block';
+  qrScanner = new Html5Qrcode("reader");
+  try{
+    await qrScanner.start({facingMode:"environment"}, {fps:10, qrbox:220}, decodedText => {
+      el('barcodeInput').value = decodedText; qrScanner.stop(); wrap.style.display='none'; doLookup();
+    });
+  }catch(err){ el('cam-note').textContent='Không mở được camera — kiểm tra đã cho phép quyền Camera cho trang web này trong trình duyệt chưa.'; wrap.style.display='none'; }
+});
+</script>
+</body>
+</html>
