@@ -50,8 +50,10 @@
   .btn-outline{ background:var(--surface); border:1.5px solid var(--border); color:var(--ink); flex:1; }
   .btn-accent{ background:var(--accent); color:var(--accent-ink); flex:1; }
 
-  #cameraWrap{ display:none; margin-top:12px; border-radius:10px; overflow:hidden; }
-  #cam-note{ font-size:12px; color:var(--muted); margin-top:6px; }
+  #cameraWrap{ display:none; width:100%; position:relative; margin-top:12px; border-radius:10px; overflow:hidden; background:#000; }
+  #zxing-video{ width:100%; display:block; object-fit:cover; }
+  .scan-line{ position:absolute; top:50%; left:5%; right:5%; height:2px; background:rgba(255,0,0,0.7); box-shadow:0 0 6px red; transform:translateY(-50%); }
+  #cam-note{ font-size:12px; color:var(--muted); margin-top:6px; text-align:center; }
 
   .card{ background:var(--surface); border:1px solid var(--border); border-radius:14px;
     padding:16px; margin-bottom:14px; display:none; }
@@ -172,7 +174,7 @@
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" onerror="document.getElementById('btnCamera').style.display='none'; document.getElementById('cam-note').textContent='Camera scan không khả dụng ở bản xem trước - dùng máy quét tay hoặc gõ mã.'"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.2/umd/index.min.js" onerror="document.getElementById('btnCamera').style.display='none'; document.getElementById('cam-note').textContent='Lỗi tải thư viện Camera.'"></script>
 <script>
 const EMOJI_MAP = {1:'1️⃣',2:'2️⃣',3:'3️⃣',4:'4️⃣',5:'5️⃣',6:'6️⃣',7:'7️⃣',8:'8️⃣',9:'9️⃣'};
 
@@ -650,31 +652,74 @@ el('btnUndo').addEventListener('click', () => {
 });
 
 /* Camera scan */
-let qrScanner = null;
+/* ============================================================
+   CAMERA SCANNER (ZXing-js - Hỗ trợ Full HD & Autofocus cho mã 1D)
+   ============================================================ */
+let zxingReader = null;
+let zxingStream = null;
+
+function stopCamera() {
+  if (zxingReader) { try { zxingReader.reset(); } catch(e){} zxingReader = null; }
+  if (zxingStream) { zxingStream.getTracks().forEach(t => t.stop()); zxingStream = null; }
+  el('cameraWrap').style.display = 'none';
+  el('cam-note').textContent = '';
+}
+
 el('btnCamera').addEventListener('click', async () => {
   const wrap = el('cameraWrap');
-  if(wrap.style.display === 'block'){ 
-    wrap.style.display='none'; 
-    if(qrScanner){ try{ await qrScanner.stop(); qrScanner.clear(); } catch(e){} } 
-    return; 
-  }
-  if(typeof Html5Qrcode === 'undefined'){ el('cam-note').textContent='Thư viện camera chưa tải được — dùng máy quét tay hoặc gõ mã.'; return; }
+  if (wrap.style.display === 'block') { stopCamera(); return; }
+
+  if (typeof ZXing === 'undefined') { el('cam-note').textContent = 'Thư viện camera chưa tải được.'; return; }
   wrap.style.display = 'block';
-  qrScanner = new Html5Qrcode("reader");
-  try{
-    await qrScanner.start({facingMode:"environment"}, {fps:10, qrbox:220}, async decodedText => {
-      el('barcodeInput').value = decodedText; 
-      try { await qrScanner.stop(); qrScanner.clear(); } catch(e){} 
-      wrap.style.display='none'; 
-      doLookup();
+  el('cam-note').textContent = 'Đang khởi động camera HD...';
+
+  // Tạo khung video và tia laser nếu chưa có
+  if (!document.getElementById('zxing-video')) {
+    wrap.innerHTML = '<video id="zxing-video" playsinline></video><div class="scan-line"></div>';
+  }
+  const video = document.getElementById('zxing-video');
+
+  try {
+    // Ép mở camera sau, độ phân giải 1080p và lấy nét liên tục
+    zxingStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        focusMode: { ideal: "continuous" } 
+      }
     });
-  }catch(err){ el('cam-note').textContent='Không mở được camera — cấp quyền Camera cho trình duyệt chưa?'; wrap.style.display='none'; }
+    video.srcObject = zxingStream;
+    await video.play();
+
+    // Giới hạn chỉ tìm các chuẩn mã vạch hay dùng trong kho (Tăng tốc độ xử lý CPU)
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.CODE_128, // USPS
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.QR_CODE
+    ]);
+
+    zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+    zxingReader.decodeFromVideoElement(video, (result, err) => {
+      if (result) {
+        // Có tiếng bíp nhẹ giả lập (tùy chọn)
+        try { navigator.vibrate && navigator.vibrate(100); } catch(e){}
+        el('barcodeInput').value = result.getText();
+        stopCamera();
+        doLookup();
+      }
+    });
+    el('cam-note').textContent = 'Đưa mã vạch nằm ngang đường chỉ đỏ...';
+  } catch (err) {
+    el('cam-note').textContent = 'Không mở được camera — Hãy đảm bảo đã cấp quyền.';
+    stopCamera();
+  }
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden" && qrScanner && el('cameraWrap').style.display === 'block') {
-    qrScanner.stop().then(() => { qrScanner.clear(); el('cameraWrap').style.display = 'none'; }).catch(()=>{});
-  }
+  if (document.visibilityState === "hidden") stopCamera();
 });
 </script>
 </body>
